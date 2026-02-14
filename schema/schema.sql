@@ -1,5 +1,7 @@
 -- Resist Events D1 Schema
 
+DROP TABLE IF EXISTS review_seen;
+DROP TABLE IF EXISTS message_reads;
 DROP TABLE IF EXISTS message_replies;
 DROP TABLE IF EXISTS messages;
 DROP TABLE IF EXISTS events;
@@ -57,6 +59,7 @@ CREATE TABLE messages (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   topic TEXT NOT NULL,
   org_id INTEGER REFERENCES organizations(id),
+  event_id INTEGER REFERENCES events(id),
   archived INTEGER DEFAULT 0,
   created_at TEXT DEFAULT (datetime('now'))
 );
@@ -68,6 +71,19 @@ CREATE TABLE message_replies (
   text TEXT NOT NULL,
   user_id INTEGER REFERENCES users(id),
   created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE message_reads (
+  user_id INTEGER NOT NULL,
+  message_id INTEGER NOT NULL REFERENCES messages(id),
+  last_read_reply_id INTEGER DEFAULT 0,
+  PRIMARY KEY (user_id, message_id)
+);
+
+CREATE TABLE review_seen (
+  user_id INTEGER NOT NULL,
+  event_id INTEGER NOT NULL REFERENCES events(id),
+  PRIMARY KEY (user_id, event_id)
 );
 
 -- Indexes

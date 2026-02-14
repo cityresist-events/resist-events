@@ -3,15 +3,33 @@
 
 export async function onRequestGet(context) {
   const db = context.env.RESIST_DB;
+  const userId = context.data.demoUserId;
+  const role = context.data.demoRole;
 
   try {
-    const { results } = await db.prepare(`
+    let query = `
       SELECT e.*, o.name as org_name, o.abbreviation as org_abbreviation,
         CASE WHEN e.org_id = (SELECT org_id FROM users WHERE id = ?) THEN 1 ELSE 0 END as org_is_host
+    `;
+
+    // For admins, include review_seen status
+    if (role === 'admin') {
+      query += `,
+        CASE WHEN e.status IN ('review', 'pending_org') AND EXISTS (SELECT 1 FROM review_seen rs WHERE rs.event_id = e.id AND rs.user_id = ?) THEN 1 ELSE 0 END as is_seen
+      `;
+    }
+
+    query += `
       FROM events e
       JOIN organizations o ON e.org_id = o.id
       ORDER BY e.date ASC
-    `).bind(context.data.demoUserId || 0).all();
+    `;
+
+    const bindParams = role === 'admin'
+      ? [userId || 0, userId || 0]
+      : [userId || 0];
+
+    const { results } = await db.prepare(query).bind(...bindParams).all();
 
     const events = results.map(row => ({
       ...row,
@@ -20,6 +38,7 @@ export async function onRequestGet(context) {
       reg_required: !!row.reg_required,
       hide_address: !!row.hide_address,
       org_is_host: !!row.org_is_host,
+      is_seen: !!row.is_seen,
       archived: !!row.archived,
     }));
 
@@ -54,6 +73,18 @@ export async function onRequestPost(context) {
 
     const body = await context.request.json();
 
+    // Auto-approve if organizer belongs to the sponsoring org
+    // (their org_id matches the event's org_id)
+    let status = body.status || 'draft';
+    if (status === 'review' && orgId) {
+      // The event is always created under the user's org, so if submitting for review
+      // and the user belongs to the org, auto-approve (skip review)
+      const userBelongsToOrg = true; // events are always created under user's org
+      if (userBelongsToOrg) {
+        status = 'published';
+      }
+    }
+
     const result = await db.prepare(`
       INSERT INTO events (title, org_id, date, start_time, end_time, address, description, parking, flyer_url, website_url, reg_link, reg_required, hide_address, status, bring_items, no_bring_items, notes)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -71,13 +102,13 @@ export async function onRequestPost(context) {
       body.reg_link || '',
       body.reg_required ? 1 : 0,
       body.hide_address ? 1 : 0,
-      body.status || 'draft',
+      status,
       JSON.stringify(body.bring_items || []),
       JSON.stringify(body.no_bring_items || []),
       body.notes || ''
     ).run();
 
-    return Response.json({ ok: true, id: result.meta.last_row_id });
+    return Response.json({ ok: true, id: result.meta.last_row_id, status });
   } catch (e) {
     return Response.json({ error: e.message }, { status: 500 });
   }

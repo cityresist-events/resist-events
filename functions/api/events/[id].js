@@ -43,6 +43,16 @@ export async function onRequestPut(context) {
 
   try {
     const body = await context.request.json();
+    const userId = context.data.demoUserId;
+
+    // Auto-approve if organizer submits for review and belongs to the sponsoring org
+    if (body.status === 'review' && role === 'organizer' && userId) {
+      const user = await db.prepare('SELECT org_id FROM users WHERE id = ?').bind(userId).first();
+      const event = await db.prepare('SELECT org_id FROM events WHERE id = ?').bind(id).first();
+      if (user && event && user.org_id === event.org_id) {
+        body.status = 'published';
+      }
+    }
 
     // Build dynamic update
     const fields = [];

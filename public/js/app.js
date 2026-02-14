@@ -13,7 +13,9 @@ let cachedOrgs = [];
 let cachedMessages = [];
 let cachedUsers = [];
 let editingEventId = null;
+let cloningEvent = false;
 let pendingMessageOrgId = null;
+let pendingMessageEventId = null;
 
 // ======= API HELPERS =======
 async function api(path, options = {}) {
@@ -76,7 +78,8 @@ function showSection(section) {
   if (section === 'myEvents') { eventsPage = 1; renderMyEvents(); }
   if (section === 'contact') { viewingThread = null; renderContact(); }
   if (section === 'home') renderHomeEvents();
-  if (section === 'newEvent' && !editingEventId) resetEventForm();
+  if (section === 'newEvent' && !editingEventId && !cloningEvent) resetEventForm();
+  if (section === 'newEvent') cloningEvent = false;
   if (section === 'reviewQueue') renderReviewQueue();
   if (section === 'manageOrgs') renderAdminOrgs();
   if (section === 'manageUsers') renderAdminUsers();
@@ -236,7 +239,7 @@ async function openReviewEventDetail(id) {
   const footerHtml = `
     <button class="btn btn-success btn-sm" onclick="closeEventDetailModal(); approveEvent(${id})">Approve</button>
     <button class="btn btn-danger btn-sm" onclick="closeEventDetailModal(); rejectEvent(${id})">Reject</button>
-    <button class="btn btn-secondary btn-sm" style="margin-left:auto;" onclick="closeEventDetailModal(); openMessageOrgModal(${orgId}, '${escHtml(eventTitle).replace(/'/g, "\\'")}')">Message Org</button>
+    <button class="btn btn-secondary btn-sm" style="margin-left:auto;" onclick="closeEventDetailModal(); openMessageOrgModal(${orgId}, '${escHtml(eventTitle).replace(/'/g, "\\'")}', ${id})">Message Org</button>
   `;
   await openEventDetail(id, footerHtml);
 }
@@ -374,22 +377,25 @@ async function renderMyEvents() {
   const pageEvents = events.slice(0, eventsPage * 20);
 
   document.getElementById('myEventsList').innerHTML = pageEvents.map(e => {
-    const statusClass = e.status === 'published' ? 'status-published' : e.status === 'review' ? 'status-review' : e.status === 'draft' ? 'status-draft' : 'status-archived';
-    const statusLabel = e.status === 'published' ? 'Published' : e.status === 'review' ? 'In Review' : e.status === 'draft' ? 'Draft' : 'Archived';
+    const statusClass = e.status === 'published' ? 'status-published' : e.status === 'review' ? 'status-review' : e.status === 'pending_org' ? 'status-pending-org' : e.status === 'draft' ? 'status-draft' : 'status-archived';
+    const statusLabel = e.status === 'published' ? 'Published' : e.status === 'review' ? 'In Review' : e.status === 'pending_org' ? 'Pending Response' : e.status === 'draft' ? 'Draft' : 'Archived';
 
     return `
-      <div class="event-list-item${e.status === 'archived' ? ' archived-row' : ''}">
+      <div class="event-list-item${e.status === 'archived' ? ' archived-row' : ''}" style="cursor:pointer;" onclick="openMyEventDetail(${e.id})">
         <div class="event-list-date">${formatDate(e.date)}</div>
         <div class="event-list-name">${escHtml(e.title)}</div>
-        <span class="event-list-status ${statusClass}">${statusLabel}</span>
+        ${e.status === 'pending_org'
+          ? `<span class="event-list-status ${statusClass}" style="cursor:pointer;text-decoration:underline;" onclick="event.stopPropagation(); goToEventMessage(${e.id})" title="View conversation">${statusLabel}</span>`
+          : `<span class="event-list-status ${statusClass}">${statusLabel}</span>`
+        }
         <div class="event-list-actions">
           ${e.status !== 'archived' ? `
-            <button class="btn btn-ghost btn-xs" onclick="editEvent(${e.id})" title="Edit">Edit</button>
-            <button class="btn btn-ghost btn-xs" onclick="cloneEvent(${e.id})" title="Clone">Clone</button>
-            <button class="btn btn-ghost btn-xs" onclick="archiveEvent(${e.id})" title="Archive">Archive</button>
+            <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation(); editEvent(${e.id})" title="Edit">Edit</button>
+            <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation(); cloneEvent(${e.id})" title="Clone">Clone</button>
+            <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation(); archiveEvent(${e.id})" title="Archive">Archive</button>
           ` : `
-            <button class="btn btn-ghost btn-xs" onclick="cloneEvent(${e.id})" title="Clone">Clone</button>
-            <button class="btn btn-ghost btn-xs" onclick="unarchiveEvent(${e.id})" title="Unarchive">Unarchive</button>
+            <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation(); cloneEvent(${e.id})" title="Clone">Clone</button>
+            <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation(); unarchiveEvent(${e.id})" title="Unarchive">Unarchive</button>
           `}
         </div>
       </div>
@@ -487,9 +493,15 @@ async function cloneEvent(id) {
   document.getElementById('eventFormTitle').textContent = 'Clone Event: ' + event.title;
   document.getElementById('eventTitle').value = event.title || '';
 
-  // Clear dates so the user must pick new ones
-  document.getElementById('eventStart').value = '';
-  document.getElementById('eventEnd').value = '';
+  // Copy dates from original event
+  if (event.date && event.start_time) {
+    const startDT = parseDateTimeToLocal(event.date, event.start_time);
+    if (startDT) document.getElementById('eventStart').value = startDT;
+  }
+  if (event.date && event.end_time) {
+    const endDT = parseDateTimeToLocal(event.date, event.end_time);
+    if (endDT) document.getElementById('eventEnd').value = endDT;
+  }
 
   document.getElementById('eventDesc').value = event.description || '';
 
@@ -513,6 +525,7 @@ async function cloneEvent(id) {
   setChipSelections('bringChips', event.bring_items || []);
   setChipSelections('noBringChips', event.no_bring_items || []);
 
+  cloningEvent = true;
   showSection('newEvent');
 }
 
@@ -549,6 +562,38 @@ async function unarchiveEvent(id) {
   }
 }
 
+// ======= NAVIGATE TO EVENT MESSAGE =======
+async function goToEventMessage(eventId) {
+  await loadMessages();
+  const msg = cachedMessages.find(m => m.event_id === eventId);
+  if (msg) {
+    showSection('contact');
+    viewThread(msg.id);
+  } else {
+    showToast('Conversation not found');
+  }
+}
+
+// ======= MY EVENT DETAIL (organizer view) =======
+async function openMyEventDetail(id) {
+  const event = cachedEvents.find(e => e.id === id);
+  const statusClass = event ? (event.status === 'published' ? 'status-published' : event.status === 'review' ? 'status-review' : event.status === 'pending_org' ? 'status-pending-org' : event.status === 'draft' ? 'status-draft' : 'status-archived') : '';
+  const statusLabel = event ? (event.status === 'published' ? 'Published' : event.status === 'review' ? 'In Review' : event.status === 'pending_org' ? 'Pending Response' : event.status === 'draft' ? 'Draft' : 'Archived') : '';
+
+  const footerHtml = `
+    <span class="event-list-status ${statusClass}" style="margin-right:auto;">${statusLabel}</span>
+    ${event && event.status !== 'archived' ? `
+      <button class="btn btn-secondary btn-sm" onclick="closeEventDetailModal(); editEvent(${id})">Edit</button>
+      <button class="btn btn-ghost btn-sm" onclick="closeEventDetailModal(); cloneEvent(${id})">Clone</button>
+      <button class="btn btn-ghost btn-sm" onclick="closeEventDetailModal(); archiveEvent(${id})">Archive</button>
+    ` : `
+      <button class="btn btn-ghost btn-sm" onclick="closeEventDetailModal(); cloneEvent(${id})">Clone</button>
+      <button class="btn btn-ghost btn-sm" onclick="closeEventDetailModal(); unarchiveEvent(${id})">Unarchive</button>
+    `}
+  `;
+  await openEventDetail(id, footerHtml);
+}
+
 // ======= CONTACT =======
 async function renderContact() {
   const container = document.getElementById('contactList');
@@ -571,13 +616,18 @@ async function renderContact() {
   }
 
   container.innerHTML = topics.map(m => `
-    <div class="msg-list-item" onclick="viewThread(${m.id})">
+    <div class="msg-list-item${m.has_unread ? ' msg-unread' : ''}${m.archived ? ' archived-row' : ''}" onclick="viewThread(${m.id})">
+      ${m.has_unread ? '<span class="new-indicator">New</span>' : ''}
+      ${m.archived ? '<span class="event-list-status status-archived">Archived</span>' : ''}
       <div class="msg-topic">${escHtml(m.topic)}</div>
       <div class="msg-meta">
         <div style="font-weight:600;">${escHtml(m.org_name || 'Unknown')}</div>
         <div>${formatTimestamp(m.created_at)}</div>
       </div>
-      <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation(); archiveTopic(${m.id})" title="Archive">Archive</button>
+      ${m.archived
+        ? `<button class="btn btn-ghost btn-xs" onclick="event.stopPropagation(); unarchiveTopic(${m.id})" title="Unarchive">Unarchive</button>`
+        : `<button class="btn btn-ghost btn-xs" onclick="event.stopPropagation(); archiveTopic(${m.id})" title="Archive">Archive</button>`
+      }
     </div>
   `).join('');
 
@@ -588,9 +638,12 @@ async function renderContact() {
   document.getElementById('contactArchiveToggle').textContent = showArchivedTopics ? 'Hide Archived' : 'Show Archived';
 }
 
-function viewThread(id) {
+async function viewThread(id) {
   viewingThread = id;
-  renderContact();
+  await renderContact();
+  // After viewing a thread, the API marks it as read, so refresh badge
+  cachedMessages = []; // Force reload on next badge update
+  updateMessagesBadge();
 }
 
 async function renderThread(id) {
@@ -654,6 +707,9 @@ async function sendReply(messageId) {
     });
     showToast('Reply sent!');
     await renderThread(messageId);
+    // Refresh badge (sender's reply is auto-marked as read)
+    cachedMessages = [];
+    updateMessagesBadge();
   } catch (e) {
     showToast('Error sending reply');
   }
@@ -679,14 +735,29 @@ function archiveTopic(id) {
   );
 }
 
+async function unarchiveTopic(id) {
+  try {
+    await api('/messages/' + id, {
+      method: 'PUT',
+      body: JSON.stringify({ archived: false }),
+    });
+    showToast('Topic restored');
+    cachedMessages = [];
+    renderContact();
+  } catch (e) {
+    showToast('Error restoring topic');
+  }
+}
+
 function toggleArchivedTopics() {
   showArchivedTopics = !showArchivedTopics;
   renderContact();
 }
 
 // ======= NEW MESSAGE =======
-function openMessageOrgModal(orgId, eventTitle) {
+function openMessageOrgModal(orgId, eventTitle, eventId) {
   pendingMessageOrgId = orgId;
+  pendingMessageEventId = eventId || null;
   document.getElementById('newMsgTopic').value = eventTitle ? `Re: ${eventTitle}` : '';
   document.getElementById('newMsgText').value = '';
   openModal('newMessageModal');
@@ -703,6 +774,7 @@ async function submitNewMessage() {
   try {
     const payload = { topic, text };
     if (pendingMessageOrgId) payload.org_id = pendingMessageOrgId;
+    if (pendingMessageEventId) payload.event_id = pendingMessageEventId;
     await api('/messages', {
       method: 'POST',
       body: JSON.stringify(payload),
@@ -711,8 +783,15 @@ async function submitNewMessage() {
     document.getElementById('newMsgTopic').value = '';
     document.getElementById('newMsgText').value = '';
     pendingMessageOrgId = null;
+    pendingMessageEventId = null;
     showToast('Message sent!');
+    // Refresh caches since message may have changed event status
+    cachedMessages = [];
+    cachedEvents = [];
     if (currentSection === 'contact') renderContact();
+    if (currentSection === 'reviewQueue') renderReviewQueue();
+    updateMessagesBadge();
+    if (DemoSession.role === 'admin') updateReviewBadge();
   } catch (e) {
     showToast('Error sending message');
   }
@@ -762,7 +841,7 @@ async function saveEvent(status) {
 
   try {
     if (editingEventId) {
-      await api('/events/' + editingEventId, { method: 'PUT', body: JSON.stringify(body) });
+      const editResult = await api('/events/' + editingEventId, { method: 'PUT', body: JSON.stringify(body) });
       showToast(status === 'draft' ? 'Draft saved!' : 'Event submitted for review!');
     } else {
       // Check for recurring
@@ -790,12 +869,16 @@ async function saveEvent(status) {
             start_time: occStart.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
             end_time: occEnd.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
           };
-          await api('/events', { method: 'POST', body: JSON.stringify(occBody) });
+          const occResult = await api('/events', { method: 'POST', body: JSON.stringify(occBody) });
         }
         showToast(`${count} recurring events created!`);
       } else {
-        await api('/events', { method: 'POST', body: JSON.stringify(body) });
-        showToast(status === 'draft' ? 'Draft saved!' : 'Event submitted for review!');
+        const result = await api('/events', { method: 'POST', body: JSON.stringify(body) });
+        if (result.status === 'published' && status === 'review') {
+          showToast('Event published! (Auto-approved for your organization)');
+        } else {
+          showToast(status === 'draft' ? 'Draft saved!' : 'Event submitted for review!');
+        }
       }
     }
     editingEventId = null;
@@ -992,7 +1075,7 @@ function showLoading(containerId) {
 // ======= MESSAGES BADGE =======
 async function updateMessagesBadge() {
   await loadMessages();
-  const count = cachedMessages.filter(m => !m.archived).length;
+  const count = cachedMessages.filter(m => !m.archived && m.has_unread).length;
   const badge = document.getElementById('messagesBadge');
   if (badge) {
     badge.textContent = count;
@@ -1003,7 +1086,7 @@ async function updateMessagesBadge() {
 // ======= ADMIN: REVIEW QUEUE =======
 async function updateReviewBadge() {
   await loadEvents();
-  const count = cachedEvents.filter(e => e.status === 'review').length;
+  const count = cachedEvents.filter(e => (e.status === 'review' || e.status === 'pending_org') && !e.is_seen).length;
   const badge = document.getElementById('reviewBadge');
   if (badge) {
     badge.textContent = count;
@@ -1014,7 +1097,7 @@ async function updateReviewBadge() {
 async function renderReviewQueue() {
   showLoading('reviewQueueList');
   await loadEvents();
-  const reviewEvents = cachedEvents.filter(e => e.status === 'review');
+  const reviewEvents = cachedEvents.filter(e => e.status === 'review' || e.status === 'pending_org');
 
   const listEl = document.getElementById('reviewQueueList');
   const emptyEl = document.getElementById('reviewQueueEmpty');
@@ -1026,17 +1109,37 @@ async function renderReviewQueue() {
   }
 
   emptyEl.style.display = 'none';
-  listEl.innerHTML = reviewEvents.map(e => `
-    <div class="event-list-item" style="cursor:pointer;" onclick="openReviewEventDetail(${e.id})">
+  listEl.innerHTML = reviewEvents.map(e => {
+    const isPending = e.status === 'pending_org';
+    return `
+    <div class="event-list-item${!e.is_seen ? ' review-unseen' : ''}" style="cursor:pointer;" onclick="openReviewEventDetail(${e.id})">
+      ${!e.is_seen ? '<span class="new-indicator">New</span>' : ''}
       <div class="event-list-date">${formatDate(e.date)}</div>
       <div class="event-list-name">${escHtml(e.title)}</div>
+      ${isPending ? '<span class="event-list-status status-pending-org">Pending Response</span>' : ''}
       <div style="font-size:12px;color:var(--text-dim);white-space:nowrap;">${escHtml(e.org_name || '')}</div>
       <div class="event-list-actions">
         <button class="btn btn-success btn-xs" onclick="event.stopPropagation(); approveEvent(${e.id})">Approve</button>
         <button class="btn btn-danger btn-xs" onclick="event.stopPropagation(); rejectEvent(${e.id})">Reject</button>
       </div>
     </div>
-  `).join('');
+  `;}).join('');
+
+  // Mark all review events as seen
+  const unseenIds = reviewEvents.filter(e => !e.is_seen).map(e => e.id);
+  if (unseenIds.length > 0) {
+    try {
+      await api('/events/seen', { method: 'POST', body: JSON.stringify({ event_ids: unseenIds }) });
+      // Update local cache
+      unseenIds.forEach(id => {
+        const ev = cachedEvents.find(e => e.id === id);
+        if (ev) ev.is_seen = true;
+      });
+      updateReviewBadge();
+    } catch (e) {
+      // Non-critical, ignore
+    }
+  }
 }
 
 async function approveEvent(id) {
@@ -1092,7 +1195,7 @@ async function renderAdminOrgs() {
   }
 }
 
-function openOrgEditModal(org) {
+async function openOrgEditModal(org) {
   document.getElementById('orgEditId').value = org ? org.id : '';
   document.getElementById('orgEditModalTitle').textContent = org ? 'Edit Organization' : 'Add Organization';
   document.getElementById('orgEditName').value = org ? org.name : '';
@@ -1103,6 +1206,31 @@ function openOrgEditModal(org) {
   document.getElementById('orgEditIG').value = socials.ig || '';
   document.getElementById('orgEditX').value = socials.x || '';
   document.getElementById('orgEditRD').value = socials.rd || '';
+
+  // Show organizers for existing orgs
+  const organizersSection = document.getElementById('orgEditOrganizers');
+  const organizersList = document.getElementById('orgEditOrganizersList');
+  if (org && org.id) {
+    await loadUsers();
+    const orgUsers = cachedUsers.filter(u => u.org_id === org.id && (u.role === 'organizer' || u.role === 'admin'));
+    if (orgUsers.length > 0) {
+      organizersList.innerHTML = orgUsers.map(u => {
+        const roleClass = u.role === 'admin' ? 'role-admin' : 'role-organizer';
+        const roleLabel = u.role.charAt(0).toUpperCase() + u.role.slice(1);
+        return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);">
+          <span style="flex:1;font-weight:600;">${escHtml(u.display_name)}</span>
+          <span style="font-family:var(--font-mono);font-size:11px;color:var(--text-dim);">${escHtml(u.email || '')}</span>
+          <span class="role-badge ${roleClass}" style="font-size:10px;padding:2px 8px;">${roleLabel}</span>
+        </div>`;
+      }).join('');
+    } else {
+      organizersList.innerHTML = '<div style="color:var(--text-dim);font-style:italic;padding:6px 0;">No organizers assigned</div>';
+    }
+    organizersSection.style.display = '';
+  } else {
+    organizersSection.style.display = 'none';
+  }
+
   openModal('orgEditModal');
 }
 
@@ -1176,8 +1304,25 @@ async function loadUsers() {
 async function renderAdminUsers() {
   showLoading('adminUsersList');
   await loadUsers();
+  await loadOrgs();
 
-  document.getElementById('adminUsersList').innerHTML = cachedUsers.map(u => {
+  // Populate org filter dropdown (preserve current selection)
+  const filterEl = document.getElementById('userOrgFilter');
+  const currentFilter = filterEl.value;
+  filterEl.innerHTML = '<option value="">All Organizations</option>' +
+    '<option value="none">No Organization</option>' +
+    cachedOrgs.map(o => `<option value="${o.id}">${escHtml(o.name)}</option>`).join('');
+  filterEl.value = currentFilter;
+
+  // Apply filter
+  let users = cachedUsers;
+  if (currentFilter === 'none') {
+    users = users.filter(u => !u.org_id);
+  } else if (currentFilter) {
+    users = users.filter(u => u.org_id === parseInt(currentFilter));
+  }
+
+  document.getElementById('adminUsersList').innerHTML = users.map(u => {
     const roleClass = u.role === 'admin' ? 'role-admin' : u.role === 'organizer' ? 'role-organizer' : 'role-guest';
     const roleLabel = u.role.charAt(0).toUpperCase() + u.role.slice(1);
     return `
@@ -1185,7 +1330,6 @@ async function renderAdminUsers() {
         <div class="event-list-name">${escHtml(u.display_name)}</div>
         <div style="font-family:var(--font-mono);font-size:12px;color:var(--text-dim);min-width:160px;">${escHtml(u.email || '')}</div>
         <span class="role-badge ${roleClass}">${roleLabel}</span>
-        <div style="font-size:12px;color:var(--text-dim);white-space:nowrap;min-width:80px;">${escHtml(u.org_name || '')}</div>
         <div class="event-list-actions">
           <button class="btn btn-ghost btn-xs" onclick="editUserById(${u.id})">Edit</button>
           <button class="btn btn-danger btn-xs" onclick="deleteUserById(${u.id})">Delete</button>
@@ -1194,8 +1338,8 @@ async function renderAdminUsers() {
     `;
   }).join('');
 
-  if (cachedUsers.length === 0) {
-    document.getElementById('adminUsersList').innerHTML = '<div class="empty-state"><div class="empty-state-icon">&#x1F465;</div><h3>No users</h3><p>Add your first user above.</p></div>';
+  if (users.length === 0) {
+    document.getElementById('adminUsersList').innerHTML = '<div class="empty-state"><div class="empty-state-icon">&#x1F465;</div><h3>No users</h3><p>' + (currentFilter ? 'No users match this filter.' : 'Add your first user above.') + '</p></div>';
   }
 }
 

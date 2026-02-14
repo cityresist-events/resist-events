@@ -751,6 +751,7 @@ h1, h2, h3, h4, h5, h6 { font-family: var(--font-display); line-height: 1.2; }
 .status-review { background: rgba(229,158,47,0.12); color: var(--amber); }
 .status-draft { background: rgba(255,255,255,0.06); color: var(--text-dim); }
 .status-archived { background: rgba(224,85,85,0.08); color: rgba(224,85,85,0.6); font-style: italic; }
+.status-pending-org { background: rgba(123,94,167,0.15); color: var(--purple); }
 
 .event-list-item.archived-row {
   opacity: 0.55;
@@ -777,6 +778,25 @@ h1, h2, h3, h4, h5, h6 { font-family: var(--font-display); line-height: 1.2; }
   transition: all 0.15s;
 }
 .msg-list-item:hover { border-color: var(--clay); }
+
+.msg-list-item.msg-unread { border-color: var(--sage); background: rgba(107,143,113,0.06); }
+.event-list-item.review-unseen { border-color: var(--amber); background: rgba(229,158,47,0.06); }
+
+.new-indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 8px;
+  background: var(--sage);
+  color: white;
+  border-radius: 10px;
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  flex-shrink: 0;
+}
 
 .msg-topic {
   font-family: var(--font-display);

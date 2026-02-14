@@ -118,9 +118,9 @@ INSERT INTO events (title, org_id, date, start_time, end_time, address, descript
   );
 
 -- Messages
-INSERT INTO messages (id, topic, org_id, archived, created_at) VALUES
-  (1, 'Event approval timeline question', 2, 0, '2026-02-10 14:15:00'),
-  (2, 'Request to bring coconuts to rally', 2, 0, '2026-02-05 10:20:00');
+INSERT INTO messages (id, topic, org_id, event_id, archived, created_at) VALUES
+  (1, 'Re: Know Your Rights: Witch Trial Defense', 2, 6, 0, '2026-02-10 14:15:00'),
+  (2, 'Request to bring coconuts to rally', 2, NULL, 0, '2026-02-05 10:20:00');
 
 -- Message replies
 INSERT INTO message_replies (message_id, from_type, text, created_at) VALUES
