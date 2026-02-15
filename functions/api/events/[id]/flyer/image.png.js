@@ -21,7 +21,7 @@ export async function onRequestGet(context) {
       return new Response(object.body, {
         headers: {
           'Content-Type': 'image/png',
-          'Cache-Control': 'public, max-age=86400',
+          'Cache-Control': 'public, max-age=300',
         },
       });
     }
@@ -36,7 +36,7 @@ export async function onRequestGet(context) {
       return new Response(bytes, {
         headers: {
           'Content-Type': 'image/png',
-          'Cache-Control': 'public, max-age=86400',
+          'Cache-Control': 'public, max-age=300',
         },
       });
     }
