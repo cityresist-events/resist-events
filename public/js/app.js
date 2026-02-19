@@ -154,6 +154,8 @@ function showConfirm(title, message, btnText, onConfirm) {
 
 function closeConfirm() {
   document.getElementById('confirmDialog').classList.remove('open');
+  document.getElementById('confirmBtn').style.display = '';
+  document.querySelector('.confirm-actions').style.display = '';
 }
 
 // ======= PURPOSE =======
@@ -4180,6 +4182,13 @@ function renderHomepageSettings() {
   document.getElementById('hpTermsOfService').value = AppConfig.termsOfService;
   document.getElementById('hpCopyrightText').value = AppConfig.copyrightText;
   initHomepageSettingsTracking();
+
+  // Show/hide demo-only cards based on app mode
+  const isDemo = typeof AppMode !== 'undefined' && AppMode === 'demo';
+  const demoCard = document.getElementById('demoDisableCard');
+  if (demoCard) demoCard.style.display = isDemo ? '' : 'none';
+  const reseedCard = document.getElementById('demoReseedCard');
+  if (reseedCard) reseedCard.style.display = isDemo ? '' : 'none';
 }
 
 async function saveHomepageSettings() {
@@ -4525,6 +4534,27 @@ function previewHomepageChanges() {
     previewWindow.document.write(html);
     previewWindow.document.close();
   }
+}
+
+// ======= DEMO RE-SEED =======
+function confirmReseedDatabase() {
+  showConfirm(
+    'Wipe and Re-Seed Database?',
+    'This will wipe all changes and restore the demo database to the default seed data. This cannot be undone.',
+    'Wipe and Re-Seed',
+    async () => {
+      try {
+        const res = await fetch('/api/demo/reseed', { method: 'POST' });
+        const data = await res.json();
+        if (!res.ok || !data.ok) throw new Error(data.error || 'Re-seed failed');
+        document.cookie = 'demo_role=; Max-Age=0; path=/';
+        document.cookie = 'demo_user_id=; Max-Age=0; path=/';
+        window.location.reload();
+      } catch (e) {
+        showToast('Error: ' + e.message);
+      }
+    }
+  );
 }
 
 // ======= APP READY CALLBACK =======

@@ -224,13 +224,38 @@ function applyDemoRole() {
   }
 }
 
+// ======= BOOT CHECK =======
+let AppMode = null; // 'demo', 'live', 'setup_required'
+
+async function checkBoot() {
+  try {
+    const res = await fetch('/api/boot');
+    if (!res.ok) return 'setup_required';
+    const data = await res.json();
+    return data.mode || 'setup_required';
+  } catch (e) {
+    return 'setup_required';
+  }
+}
+
 // ======= INIT =======
 async function initApp() {
+  AppMode = await checkBoot();
+
+  if (AppMode === 'setup_required') {
+    // Show Setup Wizard — don't load the rest of the app
+    if (typeof showSetupWizard === 'function') {
+      showSetupWizard();
+    }
+    return;
+  }
+
   await loadConfig();
   const hasSession = await checkDemoSession();
   if (!hasSession) {
     showDemoRoleModal();
   }
+
   // app.js will call renderHomeEvents after this
   if (typeof onAppReady === 'function') onAppReady();
 }

@@ -1,6 +1,8 @@
 -- Camelot / Monty Python themed demo seed data
 
 -- Site Config
+INSERT INTO site_config (key, value) VALUES ('app_mode', 'demo');
+INSERT INTO site_config (key, value) VALUES ('demo_admin_email', 'dev@localhost');
 INSERT INTO site_config (key, value) VALUES ('site_name', 'Camelot Resist Events');
 INSERT INTO site_config (key, value) VALUES ('site_region', 'Camelot');
 INSERT INTO site_config (key, value) VALUES ('domain', 'cityresist.events');

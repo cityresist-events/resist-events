@@ -573,6 +573,19 @@
         <button class="btn btn-primary btn-sm" onclick="saveHomepageSettings()">Save Settings</button>
       </div>
     </div>
+
+    <!-- Disable Demo Mode (only visible in demo mode) -->
+    <div class="demo-disable-card" id="demoDisableCard" style="display:none;">
+      <h3>Disable Demo Mode</h3>
+      <p>Permanently wipe all demo data and reset the app to a fresh install state. This cannot be undone.</p>
+      <button class="btn btn-danger btn-sm" onclick="showDemoDisableModal()">Disable Demo Mode & Wipe Database</button>
+    </div>
+
+    <div class="demo-disable-card" id="demoReseedCard" style="display:none;">
+      <h3>Wipe and Re-Seed Database</h3>
+      <p>Wipe all changes and restore the demo database to the default seed data. The site will remain in demo mode.</p>
+      <button class="btn btn-danger btn-sm" onclick="confirmReseedDatabase()">Wipe and Re-Seed Database</button>
+    </div>
   </div>
 
 </main>
@@ -1008,6 +1021,7 @@
   </div>
 </div>
 
+<script src="/js/setup-wizard.js"></script>
 <script src="/js/config.js"></script>
 <script src="/js/app.js"></script>
 </body>

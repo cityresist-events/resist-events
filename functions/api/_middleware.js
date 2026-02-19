@@ -32,6 +32,8 @@ export async function onRequest(context) {
   context.data = context.data || {};
   context.data.demoRole = cookies.demo_role || null;
   context.data.demoUserId = cookies.demo_user_id ? parseInt(cookies.demo_user_id) : null;
+  context.data.skipSetupWizard = context.env.SKIP_SETUP_WIZARD === 'true';
+  context.data.demoModeEmail = context.env.DEMO_MODE_EMAIL || null;
 
   // Continue to next handler
   const response = await context.next();
