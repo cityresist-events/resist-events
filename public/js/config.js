@@ -327,25 +327,12 @@ async function cfAccessLogin() {
 async function cfAccessLogout() {
   // Set app-level logged-out flag (middleware will ignore JWT)
   await fetch('/api/auth/logout', { method: 'POST' });
-  // Kill the CF Access session in the background via hidden iframe
-  // so that clicking Login later forces full re-authentication.
-  // The team domain is kept server-side; /api/auth/cf-logout redirects there.
-  const iframe = document.createElement('iframe');
-  iframe.style.display = 'none';
-  iframe.src = '/api/auth/cf-logout';
-  document.body.appendChild(iframe);
-  setTimeout(() => iframe.remove(), 3000);
-  // Reset local session state to guest
-  LiveSession.authenticated = false;
-  LiveSession.email = null;
-  DemoSession.role = 'guest';
-  DemoSession.userId = null;
-  DemoSession.orgId = null;
-  DemoSession.orgName = '';
-  DemoSession.displayName = '';
-  // Re-render UI as guest
-  applyLiveRole();
-  if (typeof showSection === 'function') showSection('home');
+  // Full-page redirect to the CF Access app-level logout endpoint.
+  // This clears the CF_Authorization cookie on this domain so that
+  // clicking Sign In will require full re-authentication rather than
+  // silently reusing the existing CF Access session.
+  // (The iframe approach cannot clear an httpOnly cookie across origins.)
+  window.location.href = '/cdn-cgi/access/logout';
 }
 
 // ======= INIT =======
