@@ -1724,8 +1724,24 @@ function setChipSelections(containerId, items) {
 }
 
 function copyCalUrl(type) {
-  const url = document.getElementById('syncCalUrl').textContent;
-  navigator.clipboard.writeText(url).then(() => {
+  const baseUrl = document.getElementById('syncCalUrl').textContent;
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const icsUrl = baseUrl + '?tz=' + encodeURIComponent(tz);
+  const httpsUrl = icsUrl.replace(/^webcal:\/\//, 'https://');
+  if (type === 'apple') {
+    window.location.href = icsUrl; // webcal:// triggers Calendar.app on macOS/iOS
+    return;
+  }
+  if (type === 'gcal') {
+    window.open('https://calendar.google.com/calendar/r?cid=' + encodeURIComponent(icsUrl), '_blank', 'noopener');
+    return;
+  }
+  if (type === 'outlook') {
+    window.open('https://outlook.live.com/calendar/0/addfromweb?url=' + encodeURIComponent(httpsUrl), '_blank', 'noopener');
+    return;
+  }
+  // type === 'copy' — copy to clipboard
+  navigator.clipboard.writeText(icsUrl).then(() => {
     showToast('Calendar URL copied!');
   }).catch(() => {
     showToast('Calendar URL copied!');
