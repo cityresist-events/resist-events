@@ -22,14 +22,15 @@ Have some fun! Hit all of the buttons you like. Create some events, make some st
 
 ### Public calendar
 
-The public-facing side is a shared calendar that anyone can browse — no account required. Events are displayed in an agenda view by default (browseable week by week) with a full month view as an alternative. Every event has its own detail page with the full info: location, time, what to bring, what not to bring, the hosting organization, and any links or other details the organizer wishes to share.
+The public-facing side is a shared calendar that anyone can browse — no account required. Events are displayed in an agenda view by default (browseable week by week) with a full month view as an alternative. 
 
 <!-- screenshot: public calendar / agenda view -->
 <img width="2294" height="2159" alt="Public Calendar / Agenda View" src="https://github.com/user-attachments/assets/9a79d99b-7753-47e0-acc7-950a8ca3623e" />
 
+Every event has its own detail page with the full info: location, time, what to bring, what not to bring, the hosting organization, and any links or other details the organizer wishes to share.
+
 <!-- screenshot: event detail -->
 <img width="1149" height="1303" alt="Event Detail" src="https://github.com/user-attachments/assets/8c017309-3ea4-43b1-b4fc-d659215715dc" />
-
 
 The organizations page lists all participating groups with search and city filtering. Each org has its own profile with their mission, website, social links, and upcoming events.
 
