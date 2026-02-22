@@ -147,7 +147,7 @@ export async function onRequestPost(context) {
 
   try {
     const body = await context.request.json();
-    const { mode, admin_email, site_name, city, admin_group_name } = body;
+    const { mode, admin_email, site_name, city, domain, admin_group_name } = body;
 
     if (!mode || !admin_email) {
       return Response.json({ error: 'mode and admin_email are required' }, { status: 400 });
@@ -224,6 +224,9 @@ export async function onRequestPost(context) {
       configStmts.push(db.prepare(`INSERT INTO site_config (key, value) VALUES ('purpose_text', '<p style="margin-bottom:16px;line-height:1.7;">There are many organizations throughout our community that hold events, rallies, meetings, and civic actions. Finding these events can be challenging — each organization uses different communication channels, from social media to email lists to word of mouth.</p><p style="margin-bottom:16px;line-height:1.7;">We built this platform to solve that problem by creating a single, unified event calendar for our community. Our goal is to make civic engagement as easy as possible by removing barriers to finding out what''s happening and when.</p><p style="margin-bottom:16px;line-height:1.7;">Whether you''re looking for your first rally, your hundredth town hall, or a volunteer opportunity — you''re in the right place.</p><p style="line-height:1.7;">This project is <strong>open source</strong> and community-driven. Everyone is welcome.</p>')`));
       if (city) {
         configStmts.push(db.prepare("INSERT INTO site_config (key, value) VALUES ('site_region', ?)").bind(city));
+      }
+      if (domain) {
+        configStmts.push(db.prepare("INSERT INTO site_config (key, value) VALUES ('domain', ?)").bind(domain));
       }
       await db.batch(configStmts);
 

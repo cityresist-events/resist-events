@@ -129,6 +129,11 @@ function buildStep2Live() {
         <p class="form-hint">Highlighted prefix in the site header (e.g. "Camelot Resist Events").</p>
       </div>
       <div class="form-group">
+        <label class="form-label">Domain</label>
+        <input type="text" class="form-input" id="wizardDomain" placeholder="e.g. phoenixresist.events">
+        <p class="form-hint">Your site's domain name. Used for the calendar sync URL and event links.</p>
+      </div>
+      <div class="form-group">
         <label class="form-label">Admin Group Name</label>
         <input type="text" class="form-input" id="wizardAdminGroupName" placeholder="e.g. Camelot Resist Admins" value="Site Admins">
         <p class="form-hint">The name for your admin organization. We recommend something friendly like "Cityname Resist Admins".</p>
@@ -215,6 +220,7 @@ async function wizardSubmitLive() {
   const siteName = document.getElementById('wizardSiteName').value.trim();
   const email = document.getElementById('wizardEmail').value.trim();
   const city = document.getElementById('wizardCity').value.trim();
+  const domain = document.getElementById('wizardDomain').value.trim();
   const adminGroupName = document.getElementById('wizardAdminGroupName').value.trim();
   const errorEl = document.getElementById('wizardError');
   errorEl.style.display = 'none';
@@ -231,7 +237,7 @@ async function wizardSubmitLive() {
     const res = await fetch('/api/setup', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mode: 'live', admin_email: email, site_name: siteName, city, admin_group_name: adminGroupName }),
+      body: JSON.stringify({ mode: 'live', admin_email: email, site_name: siteName, city, domain, admin_group_name: adminGroupName }),
     });
     const data = await res.json();
     if (!res.ok || !data.ok) {
